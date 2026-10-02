@@ -1,0 +1,37 @@
+---
+const { title = 'Airflow Lab', description = 'A practical Apache Airflow experiment lab.' } = Astro.props;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <title>{title}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <header class="nav">
+      <a class="brand" href="/airflow-lab/">AIRFLOW<span>/</span>LAB</a>
+      <nav>
+        <a href="/airflow-lab/#experiments">Experiments</a>
+        <a href="/airflow-lab/#architecture">Architecture</a>
+        <a href="/airflow-lab/experiments/001-installation/">EXP-001</a>
+        <a href="https://github.com/nguyenngocbinh/airflow-lab" target="_blank" rel="noreferrer">GitHub ↗</a>
+      </nav>
+    </header>
+    <main>
+      <slot />
+    </main>
+    <footer class="footer">
+      <div>Airflow Lab · learn → break → debug → document</div>
+      <div>Apache Airflow 3.3.2 · Docker · WSL2</div>
+    </footer>
+  </body>
+</html>
+<style is:global>
+:root{--bg:#070b10;--panel:#0d131b;--panel2:#111922;--line:#23303c;--text:#e7eef5;--muted:#92a0ad;--accent:#55d6ff;--accent2:#7af7c8;--danger:#ff7b72;--shadow:0 20px 60px rgba(0,0,0,.28)}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(circle at top right,rgba(85,214,255,.06),transparent 28%),var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;line-height:1.6}.nav{position:sticky;top:0;z-index:20;display:flex;justify-content:space-between;align-items:center;padding:16px 5vw;background:rgba(7,11,16,.88);backdrop-filter:blur(16px);border-bottom:1px solid var(--line)}.brand{font:600 15px 'IBM Plex Mono',monospace;color:var(--text);text-decoration:none;letter-spacing:.08em}.brand span{color:var(--accent)}nav{display:flex;gap:20px;flex-wrap:wrap}nav a{color:var(--muted);font-size:13px;text-decoration:none}nav a:hover{color:var(--text)}main{max-width:1180px;margin:0 auto;padding:32px 5vw 80px}.footer{display:flex;justify-content:space-between;gap:20px;padding:24px 5vw;border-top:1px solid var(--line);color:var(--muted);font-size:12px;font-family:'IBM Plex Mono',monospace}.hero{padding:88px 0 56px;display:grid;grid-template-columns:1.1fr .9fr;gap:42px;align-items:center}.eyebrow{font:600 12px 'IBM Plex Mono',monospace;color:var(--accent);letter-spacing:.14em;text-transform:uppercase}.hero h1{font-size:clamp(46px,7vw,84px);line-height:.98;letter-spacing:-.05em;margin:16px 0}.hero p{font-size:18px;color:var(--muted);max-width:680px}.cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:26px}.btn{display:inline-block;padding:11px 16px;border:1px solid var(--line);border-radius:8px;color:var(--text);text-decoration:none;background:var(--panel)}.btn.primary{border-color:rgba(85,214,255,.45);background:rgba(85,214,255,.1)}.terminal{background:#05080c;border:1px solid var(--line);border-radius:12px;padding:18px;box-shadow:var(--shadow);font:13px/1.7 'IBM Plex Mono',monospace}.dots{display:flex;gap:6px;margin-bottom:12px}.dot{width:8px;height:8px;border-radius:50%;background:#31404b}.prompt{color:var(--accent2)}.dim{color:#6d7a85}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:12px 0 70px}.stat,.card{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:12px}.stat{padding:18px}.stat strong{display:block;font:700 26px 'IBM Plex Mono',monospace}.stat span{color:var(--muted);font-size:12px}.section{padding:40px 0}.section h2{font-size:32px;letter-spacing:-.03em}.section-intro{color:var(--muted);max-width:760px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.card{padding:20px}.card:hover{border-color:#334454}.tag{display:inline-flex;padding:4px 8px;border:1px solid var(--line);border-radius:999px;color:var(--accent);font:11px 'IBM Plex Mono',monospace}.card h3{margin:14px 0 6px}.card p{margin:0;color:var(--muted);font-size:14px}.card a{display:inline-block;margin-top:18px;color:var(--text);text-decoration:none;font-size:13px}.architecture{overflow:auto;background:#05080c;border:1px solid var(--line);border-radius:12px;padding:22px}.flow{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:10px}.node{min-width:130px;padding:14px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;text-align:center;font:12px 'IBM Plex Mono',monospace}.arrow{color:var(--accent)}.callout{margin-top:20px;padding:16px;border-left:3px solid var(--accent);background:rgba(85,214,255,.05);color:#c5d0d9}.article{max-width:900px;margin:52px auto}.article h1{font-size:clamp(38px,6vw,64px);line-height:1.05;letter-spacing:-.045em}.article h2{margin-top:48px;font-size:28px}.article p,.article li{color:#c3ccd5}.article pre{overflow:auto;background:#05080c;border:1px solid var(--line);padding:18px;border-radius:10px;font:13px/1.7 'IBM Plex Mono',monospace}.breadcrumbs{color:var(--muted);font:12px 'IBM Plex Mono',monospace}.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}.check{color:var(--accent2)}.fail{color:var(--danger)}@media(max-width:850px){.hero{grid-template-columns:1fr;padding-top:48px}.grid,.stats,.two{grid-template-columns:1fr}.nav{align-items:flex-start;gap:16px;flex-direction:column}.footer{flex-direction:column}}
+</style>
