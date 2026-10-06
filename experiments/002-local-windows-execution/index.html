@@ -1,0 +1,63 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="Airflow orchestration with Windows as the execution environment."><title>EXP-002 · Local Windows Execution | Airflow Lab</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="/airflow-lab/_astro/BaseLayout.B2tw_H77.css"></head><body><header class="nav"><a class="brand" href="/airflow-lab/">AIRFLOW<span>/</span>LAB</a><nav><a href="/airflow-lab/#experiments">Experiments</a><a href="/airflow-lab/#architecture">Architecture</a><a href="/airflow-lab/experiments/001-installation/">EXP-001</a><a href="https://github.com/nguyenngocbinh/airflow-lab" target="_blank" rel="noreferrer">GitHub ↗</a></nav></header><main><article class="article"><div class="breadcrumbs">AIRFLOW LAB / EXPERIMENTS / EXP-002</div><div class="eyebrow" style="margin-top:16px">Architecture / Windows Execution</div><h1>Run Airflow Orchestration with Windows as the Execution Environment</h1><p>Objective: keep Airflow focused on orchestration while Python/SQL/ML workloads execute in the Windows environment <code>env_mortgage</code>. This experiment records the networking tests, the Windows Agent approach, and the offline deployment design.</p><h2>01 · Initial architecture</h2><p>The original design placed Airflow on a remote Docker server and the workload on Windows. The remote server was <code>10.1.6.45</code>; the Windows execution machine was<code>10.1.7.58</code>.</p><pre><code>Airflow Server 10.1.6.45
+        |
+        | HTTP :8000
+        v
+Windows 10.1.7.58
+  FastAPI Agent
+        |
+        v
+env_mortgage -> Python / SQL / ML</code></pre><h2>02 · Why Git still works while Agent HTTP fails</h2><p>Git pull/push and Airflow-to-Windows execution are different network flows. Git uses outbound HTTPS (normally TCP 443) from the machine to GitHub. The Agent test required an inbound connection from <code>10.1.6.45</code> to<code>10.1.7.58:8000</code>. Corporate networks may allow outbound traffic while restricting inbound traffic between subnets.</p><h2>03 · Windows Agent</h2><p>A FastAPI Agent was built at <code>E:\airflow\app.py</code>. It exposes<code>/health</code>, <code>/jobs/run</code> and <code>/jobs/&#123;job_id&#125;</code>, keeps an allowlist of runnable jobs, and uses <code>sys.executable</code> so jobs run with the same Conda environment as the Agent.</p><pre><code>E:\airflow\
+├── app.py
+├── jobs\
+│   └── hello_job.py
+└── logs\
+    └── hello_job.log</code></pre><h2>04 · Evidence that the Agent itself is healthy</h2><p>Windows showed the service listening on all interfaces:</p><pre><code>TCP  0.0.0.0:8000  0.0.0.0:0  LISTENING  31136</code></pre><p>The health check from Windows to its LAN IP succeeded:</p><pre><code>python -c "import urllib.request; print(urllib.request.urlopen('http://10.1.7.58:8000/health', timeout=5).read().decode())"
+
+&#123;"status":"ok","host":"Windows Local",
+ "python":"c:\\ProgramData\\Anaconda3\\envs\\env_mortgage\\python.exe",
+ "python_version":"3.10.13 ..."&#125;</code></pre><h2>05 · Network troubleshooting</h2><p>A Windows inbound firewall rule was created for the Airflow server only:</p><pre><code>New-NetFirewallRule \
+  -DisplayName "Airflow Local Agent 8000" \
+  -Direction Inbound \
+  -Protocol TCP \
+  -LocalPort 8000 \
+  -RemoteAddress 10.1.6.45 \
+  -Action Allow</code></pre><p>Despite this, the Airflow server timed out when calling the endpoint:</p><pre><code>curl --noproxy "*" --connect-timeout 5 http://10.1.7.58:8000/health
+
+curl: (28) Connection timed out after 5000 milliseconds
+
+nc -vz -w 5 10.1.7.58 8000
+Ncat: TIMEOUT.</code></pre><p>The Windows firewall profile check showed the profiles disabled, while the dedicated rule was enabled and allowed TCP/8000. Taken together with the timeout, the evidence points to a routing/network ACL restriction between <code>10.1.6.45</code> and<code>10.1.7.58</code>, rather than a FastAPI or Uvicorn problem.</p><h2>06 · Preferred architecture</h2><p>The preferred target is an all-in-one Windows development and execution machine. Airflow runs locally in Docker/Linux containers; Windows remains the execution host with the existing <code>env_mortgage</code> environment.</p><pre><code>Windows 10.1.7.58
+|
++-- Docker Desktop
+|   +-- Airflow
+|   +-- PostgreSQL
+|   +-- Redis
+|
++-- E:\airflow
+|   +-- dags\
+|   +-- jobs\
+|   +-- sql\
+|   +-- logs\
+|   +-- agent\
+|
++-- Conda
+    +-- env_mortgage
+
+Airflow container -> host.docker.internal:8000 -> Windows Agent
+                                      |
+                                      v
+                                env_mortgage</code></pre><h2>07 · Responsibilities</h2><div class="two"><div class="card"><h3>Airflow</h3><p>Scheduling, DAG parsing, dependencies, retries, timeouts, orchestration, task state and monitoring.</p></div><div class="card"><h3>Windows</h3><p>Python, pandas, DB2/MSSQL access, SQL, models, files, business logic and actual execution inside <code>env_mortgage</code>.</p></div></div><h2>08 · Where code lives</h2><p>Source-of-truth can remain in Git/GitHub on an Internet-connected development machine. The Airflow scheduler still needs access to DAG files, so DAG source must eventually be present under Airflow's <code>dags/</code> directory. Business logic does not need to be copied into the Airflow container when the DAG only invokes the Windows Agent.</p><pre><code>airflow-lab/
+├── dags/       # Airflow orchestration code
+├── jobs/       # Windows execution code
+├── sql/        # SQL assets
+├── config/     # configuration templates
+├── agent/      # FastAPI Windows Agent
+└── docs/       # experiment notes</code></pre><h2>09 · Offline Windows machine</h2><p>The target Windows machine may have no Internet access. Docker images can therefore be prepared on an Internet-connected machine, exported with <code>docker save</code>, copied offline, and imported with <code>docker load</code>. The Conda execution environment can be packaged with <code>conda-pack</code>.</p><pre><code># Connected machine
+docker images
+docker save -o airflow-images.tar &lt;images...&gt;
+
+# Offline 10.1.7.58
+docker load -i airflow-images.tar
+
+# Package Python execution environment
+conda pack -n env_mortgage -o env_mortgage.tar.gz</code></pre><h2>10 · Two network patterns</h2><p><strong>Direct Agent call:</strong> Airflow calls Windows directly. This is simplest when the network allows<code>10.1.6.45 → 10.1.7.58:8000</code>.</p><p><strong>Polling / outbound Agent:</strong> Windows initiates the connection to the Airflow-side service, polls for work, executes locally, and reports status. This is the fallback when corporate policy blocks inbound connections to workstations.</p><h2>11 · Lessons learned</h2><ul><li>Git connectivity does not prove bidirectional connectivity between internal subnets.</li><li>When Uvicorn listens on <code>0.0.0.0:8000</code> and local/LAN health checks work, focus on network path, not application code.</li><li>Keep Airflow as an orchestration layer; keep business execution in the environment that actually has the required DB drivers and ML libraries.</li><li>For an offline host, transfer Docker images and Python environments explicitly instead of expecting runtime Internet access.</li><li>Do not expose arbitrary shell execution from the Agent; use a strict job allowlist and authentication token.</li></ul><div class="callout">Next: <strong>EXP-003 — Local Docker Airflow</strong>. Consolidate the stack onto Windows<code>10.1.7.58</code>, verify <code>host.docker.internal:8000</code>, and run the first real DAG → Windows Agent → <code>env_mortgage</code> workflow.</div></article></main><footer class="footer"><div>Airflow Lab · learn → break → debug → document</div><div>Apache Airflow 3.3.2 · Docker · WSL2</div></footer></body></html>

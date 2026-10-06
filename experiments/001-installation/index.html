@@ -1,0 +1,29 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="Install Apache Airflow 3.3.2 on Windows with Docker Desktop and WSL2."><title>EXP-001 · Installation | Airflow Lab</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="/airflow-lab/_astro/BaseLayout.B2tw_H77.css"></head><body><header class="nav"><a class="brand" href="/airflow-lab/">AIRFLOW<span>/</span>LAB</a><nav><a href="/airflow-lab/#experiments">Experiments</a><a href="/airflow-lab/#architecture">Architecture</a><a href="/airflow-lab/experiments/001-installation/">EXP-001</a><a href="https://github.com/nguyenngocbinh/airflow-lab" target="_blank" rel="noreferrer">GitHub ↗</a></nav></header><main><article class="article"><div class="breadcrumbs">AIRFLOW LAB / EXPERIMENTS / EXP-001</div><div class="eyebrow" style="margin-top:16px">Installation / Completed</div><h1>Install Apache Airflow 3.3.2 on Windows</h1><p>Objective: get a local Airflow stack running with Docker Desktop + WSL2, while documenting the real troubleshooting path.</p><h2>01 · Environment</h2><ul><li>Windows + WSL2</li><li>Docker 29.8.1</li><li>Docker Compose 5.5.1</li><li>Apache Airflow 3.3.2</li><li>PostgreSQL 16</li><li>Redis 7.2-bookworm</li><li>Workspace: <code>D:\airflow</code></li></ul><h2>02 · Initial setup</h2><pre><code>mkdir D:\airflow
+cd D:\airflow
+
+mkdir dags
+mkdir logs
+mkdir plugins</code></pre><p>The official Airflow Docker Compose file was placed at <code>D:\airflow\docker-compose.yaml</code>. The <code>.env</code> file used <code>AIRFLOW_UID=50000</code> and a generated Fernet key.</p><h2>03 · Disk issue</h2><p>During the first Docker startup, Docker reported an I/O error while writing containerd metadata. The host had only about 4.5 GB free on C: while D: had more than 300 GB free.</p><pre><code>commit failed:
+write /var/lib/desktop-containerd/.../metadata.db:
+input/output error</code></pre><div class="callout">Lesson: check Docker storage early. For this lab, Docker Desktop's disk image was moved to the larger D: drive rather than manually copying the underlying VHDX.</div><h2>04 · API Server failed to start</h2><p>After <code>docker compose up -d</code>, PostgreSQL and Redis were healthy, but the API server repeatedly restarted with exit code 0.</p><pre><code>docker compose ps -a</code></pre><pre><code>airflow-airflow-apiserver-1   Restarting (0)
+airflow-postgres-1             Up (healthy)
+airflow-redis-1                Up (healthy)</code></pre><h2>05 · Isolate the image</h2><p>The key debugging step was to stop blaming Compose and test the Airflow image directly.</p><pre><code>docker run --rm apache/airflow:3.3.2 airflow version</code></pre><p>The first local image produced no output. Bypassing the entrypoint exposed the underlying problem:</p><pre><code>docker run --rm --entrypoint /bin/bash apache/airflow:3.3.2 -c "echo HELLO; python --version; which airflow; airflow version"
+
+HELLO
+Python 3.13.15
+/home/airflow/.local/bin/airflow
+
+ModuleNotFoundError: No module named 'airflow'</code></pre><p>That meant the local Airflow image was incomplete or corrupted: the executable existed, but the Python package could not be imported.</p><h2>06 · Recovery</h2><pre><code>docker compose down
+docker ps -a --filter "ancestor=apache/airflow:3.3.2"
+docker rm -f &lt;remaining-airflow-container-ids&gt;
+docker rmi apache/airflow:3.3.2
+docker pull apache/airflow:3.3.2</code></pre><p>Before restarting Compose, the refreshed image was tested independently:</p><pre><code>docker run --rm apache/airflow:3.3.2 airflow version
+
+3.3.2</code></pre><h2>07 · Final result</h2><pre><code>docker compose up -d
+docker compose ps</code></pre><pre><code>✔ airflow-apiserver        Up (healthy)
+✔ airflow-dag-processor    Up (healthy)
+✔ airflow-scheduler        Up (healthy)
+✔ airflow-triggerer        Up (healthy)
+✔ airflow-worker           Up (healthy)
+✔ postgres                 Up (healthy)
+✔ redis                    Up (healthy)</code></pre><h2>08 · Access</h2><pre><code>http://localhost:8080</code></pre><h2>09 · What I learned</h2><ul><li class="check">Debug from infrastructure → image → container → entrypoint → command → application.</li><li class="check">A container exiting with code 0 can still be unusable.</li><li class="check">Test a base image independently before changing a large Compose configuration.</li><li class="check">Keep Docker data on a disk with enough capacity.</li><li class="check">Do not use <code>docker compose down -v</code> while trying to preserve database volumes.</li></ul><div class="callout">Next: <strong>EXP-002 — Hello World DAG</strong>. The next experiment turns the working platform into a real DAG and explains task state, scheduling and dependencies.</div></article></main><footer class="footer"><div>Airflow Lab · learn → break → debug → document</div><div>Apache Airflow 3.3.2 · Docker · WSL2</div></footer></body></html>
